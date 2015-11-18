@@ -295,6 +295,13 @@ public abstract class Tree {
     public static final int READLINEEXPR = READINTEXPR + 1;
     public static final int PRINT = READLINEEXPR + 1;
     
+    /*new operator */
+	public static final int COND = PRINT + 1;
+	public static final int NUMINSTANCES = COND + 1;
+	public static final int GUARD = NUMINSTANCES + 1;
+	public static final int GUARDIF = GUARD + 1;
+	public static final int GUARDDO = GUARDIF + 1;
+	
     /**
      * Tags for Literal and TypeLiteral
      */
@@ -1340,149 +1347,354 @@ public abstract class Tree {
     	}
     }
 
-    /**
-      * A generic visitor class for trees.
-      */
-    public static abstract class Visitor {
+	/**
+	 * New included class for trees.
+	 */
+	public static class TypeNum extends Expr {
 
-        public Visitor() {
-            super();
-        }
+		public String className;		
 
-        public void visitTopLevel(TopLevel that) {
-            visitTree(that);
-        }
+		public TypeNum(int kind, String className, Location loc) {
+			super(NUMINSTANCES, loc);						
+			this.className = className;
+		}
 
-        public void visitClassDef(ClassDef that) {
-            visitTree(that);
-        }
+		@Override
+		public void accept(Visitor v) {
+			v.visitTypeNum(this);
+		}
 
-        public void visitMethodDef(MethodDef that) {
-            visitTree(that);
-        }
+		@Override
+		public void printTo(IndentPrintWriter pw) {
+			pw.println("numinstances");
+			pw.incIndent();			
+			pw.println(className);
+			pw.decIndent();
+		}
+	}	
+		
+	public static class Ternary extends Expr {
 
-        public void visitVarDef(VarDef that) {
-            visitTree(that);
-        }
+		public Expr first; 
+		public Expr left;
+		public Expr right;
 
-        public void visitSkip(Skip that) {
-            visitTree(that);
-        }
+		public Ternary(int kind, Expr first, Expr left, Expr right, Location loc) {
+			super(kind, loc);
+			this.first = first;
+			this.left = left;
+			this.right = right;
+		}
 
-        public void visitBlock(Block that) {
-            visitTree(that);
-        }
+		private void ternaryOperatorPrintTo(IndentPrintWriter pw, String op) {
+			pw.println(op);
+			pw.incIndent();
+			first.printTo(pw);
+			left.printTo(pw);
+			right.printTo(pw);
+			pw.decIndent();
+		}
 
-        public void visitWhileLoop(WhileLoop that) {
-            visitTree(that);
-        }
+		@Override
+		public void accept(Visitor visitor) {
+			visitor.visitTernary(this);
+		}
 
-        public void visitForLoop(ForLoop that) {
-            visitTree(that);
-        }
+		@Override
+		public void printTo(IndentPrintWriter pw) {
+			switch (tag) {    		    			
+			case COND:
+				ternaryOperatorPrintTo(pw, "cond");
+				break;
+			}
+		}
+	}
+	
+	public static class Guard extends Expr {
 
-        public void visitIf(If that) {
-            visitTree(that);
-        }
+		public Expr boolExpr;
+		public Tree body;
 
-        public void visitExec(Exec that) {
-            visitTree(that);
-        }
+		public Guard(Expr boolExpr, Tree body, Location loc) {
+			super(Tree.GUARD, loc);						
+			this.boolExpr = boolExpr;
+			this.body = body;
+		}
 
-        public void visitBreak(Break that) {
-            visitTree(that);
-        }
+		@Override
+		public void accept(Visitor v) {
+			v.visitGuard(this);
+		}
 
-        public void visitReturn(Return that) {
-            visitTree(that);
-        }
+		@Override
+		public void printTo(IndentPrintWriter pw) {
+			pw.println("guardedstmt");
+			pw.incIndent();			
+			boolExpr.printTo(pw);
+			if (body != null){
+				body.printTo(pw);
+			}
+			pw.decIndent();
+		}
+	}
+	
+	public static class GuardIf extends Expr {
+		
+		public List<Guard> guards;
 
-        public void visitApply(Apply that) {
-            visitTree(that);
-        }
+		public GuardIf(List<Guard> guards, Location loc) {
+			super(GUARDIF, loc);
+			this.guards = guards;
+		}
 
-        public void visitNewClass(NewClass that) {
-            visitTree(that);
-        }
+		@Override
+		public void accept(Visitor v) {
+			v.visitGuardIf(this);
+		}
 
-        public void visitNewArray(NewArray that) {
-            visitTree(that);
-        }
+		@Override
+		public void printTo(IndentPrintWriter pw) {
+			pw.println("guardedif");
+			pw.incIndent();
+			for (Guard f : guards) {
+				f.printTo(pw);
+			}
+			pw.decIndent();
+		}
+	}
+	
+	public static class GuardDo extends Expr {
 
-        public void visitAssign(Assign that) {
-            visitTree(that);
-        }
+		public List<Guard> guards;
 
-        public void visitUnary(Unary that) {
-            visitTree(that);
-        }
+		public GuardDo(List<Guard> guards, Location loc) {
+			super(GUARDDO, loc);
+			this.guards = guards;
+		}
 
-        public void visitBinary(Binary that) {
-            visitTree(that);
-        }
+		@Override
+		public void accept(Visitor v) {
+			v.visitGuardDo(this);
+		}
 
-        public void visitCallExpr(CallExpr that) {
-            visitTree(that);
-        }
+		@Override
+		public void printTo(IndentPrintWriter pw) {
+			pw.println("guardeddo");
+			pw.incIndent();
+			for (Guard f : guards) {
+				f.printTo(pw);
+			}
+			pw.decIndent();
+		}
+	}
+	
+	public static class SelfOp extends Expr {
 
-        public void visitReadIntExpr(ReadIntExpr that) {
-            visitTree(that);
-        }
+		public Expr expr;
 
-        public void visitReadLineExpr(ReadLineExpr that) {
-            visitTree(that);
-        }
+		public SelfOp(int kind, Expr expr, Location loc) {
+			super(kind, loc);
+			this.expr = expr;
+		}
 
-        public void visitPrint(Print that) {
-            visitTree(that);
-        }
+		private void selfOperatorToString(IndentPrintWriter pw, String op) {
+			pw.println(op);
+			pw.incIndent();
+			expr.printTo(pw);
+			pw.decIndent();
+		}
 
-        public void visitThisExpr(ThisExpr that) {
-            visitTree(that);
-        }
+		@Override
+		public void accept(Visitor v) {
+			v.visitSelfOp(this);
+		}
 
-        public void visitLValue(LValue that) {
-            visitTree(that);
-        }
+		@Override
+		public void printTo(IndentPrintWriter pw) {
+			switch (tag) {
+			case PREINC:
+				selfOperatorToString(pw, "preinc");
+				break;
+			case POSTINC:
+				selfOperatorToString(pw, "postinc");
+				break;
+			case PREDEC:
+				selfOperatorToString(pw, "predec");
+				break;
+			case POSTDEC:
+				selfOperatorToString(pw, "postdec");
+				break;
+			}
+		}
+	}
+	
+	/**
+	 * A generic visitor class for trees.
+	 */
+	public static abstract class Visitor {
 
-        public void visitTypeCast(TypeCast that) {
-            visitTree(that);
-        }
+		public Visitor() {
+			super();
+		}
 
-        public void visitTypeTest(TypeTest that) {
-            visitTree(that);
-        }
+		public void visitTopLevel(TopLevel that) {
+			visitTree(that);
+		}
 
-        public void visitIndexed(Indexed that) {
-            visitTree(that);
-        }
+		public void visitClassDef(ClassDef that) {
+			visitTree(that);
+		}
 
-        public void visitIdent(Ident that) {
-            visitTree(that);
-        }
+		public void visitMethodDef(MethodDef that) {
+			visitTree(that);
+		}
 
-        public void visitLiteral(Literal that) {
-            visitTree(that);
-        }
+		public void visitVarDef(VarDef that) {
+			visitTree(that);
+		}
 
-        public void visitNull(Null that) {
-            visitTree(that);
-        }
+		public void visitSkip(Skip that) {
+			visitTree(that);
+		}
 
-        public void visitTypeIdent(TypeIdent that) {
-            visitTree(that);
-        }
+		public void visitBlock(Block that) {
+			visitTree(that);
+		}
 
-        public void visitTypeClass(TypeClass that) {
-            visitTree(that);
-        }
+		public void visitWhileLoop(WhileLoop that) {
+			visitTree(that);
+		}
 
-        public void visitTypeArray(TypeArray that) {
-            visitTree(that);
-        }
+		public void visitForLoop(ForLoop that) {
+			visitTree(that);
+		}
 
-        public void visitTree(Tree that) {
-            assert false;
-        }
-    }
+		public void visitIf(If that) {
+			visitTree(that);
+		}
+
+		public void visitExec(Exec that) {
+			visitTree(that);
+		}
+
+		public void visitBreak(Break that) {
+			visitTree(that);
+		}
+
+		public void visitReturn(Return that) {
+			visitTree(that);
+		}
+
+		public void visitApply(Apply that) {
+			visitTree(that);
+		}
+
+		public void visitNewClass(NewClass that) {
+			visitTree(that);
+		}
+
+		public void visitNewArray(NewArray that) {
+			visitTree(that);
+		}
+
+		public void visitAssign(Assign that) {
+			visitTree(that);
+		}
+
+		public void visitUnary(Unary that) {
+			visitTree(that);
+		}
+
+		public void visitBinary(Binary that) {
+			visitTree(that);
+		}
+
+		public void visitCallExpr(CallExpr that) {
+			visitTree(that);
+		}
+
+		public void visitReadIntExpr(ReadIntExpr that) {
+			visitTree(that);
+		}
+
+		public void visitReadLineExpr(ReadLineExpr that) {
+			visitTree(that);
+		}
+
+		public void visitPrint(Print that) {
+			visitTree(that);
+		}
+
+		public void visitThisExpr(ThisExpr that) {
+			visitTree(that);
+		}
+
+		public void visitLValue(LValue that) {
+			visitTree(that);
+		}
+
+		public void visitTypeCast(TypeCast that) {
+			visitTree(that);
+		}
+
+		public void visitTypeTest(TypeTest that) {
+			visitTree(that);
+		}
+		
+		public void visitIndexed(Indexed that) {
+			visitTree(that);
+		}
+
+		public void visitIdent(Ident that) {
+			visitTree(that);
+		}
+
+		public void visitLiteral(Literal that) {
+			visitTree(that);
+		}
+
+		public void visitNull(Null that) {
+			visitTree(that);
+		}
+
+		public void visitTypeIdent(TypeIdent that) {
+			visitTree(that);
+		}
+
+		public void visitTypeClass(TypeClass that) {
+			visitTree(that);
+		}
+
+		public void visitTypeArray(TypeArray that) {
+			visitTree(that);
+		}
+
+		public void visitTree(Tree that) {
+			assert false;
+		}
+		
+		public void visitTernary(Ternary that){
+			visitTree(that);
+		}
+		
+		public void visitGuard(Guard that){
+			visitTree(that);
+		}
+		
+		public void visitGuardIf(GuardIf that){
+			visitTree(that);
+		}
+		
+		public void visitGuardDo(GuardDo that){
+			visitTree(that);
+		}
+		
+		public void visitSelfOp(SelfOp that){
+			visitTree(that);
+		}
+		
+		public void visitTypeNum(TypeNum that) {
+			visitTree(that);
+		}
+	}
 }

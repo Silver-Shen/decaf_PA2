@@ -21,3 +21,5 @@ local.properties
 *.docx
 /TestCases
 /tools
+.metadata/
+result/
